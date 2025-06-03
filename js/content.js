@@ -1,80 +1,156 @@
-﻿let timer = null;
-var isUpload = false;
-var descData = null;
-var goodsData = null;
-var pushDataTimerId = null;
-chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
-  console.log(message);
-  if (message.action === "descData") {
-    descData = message.data;
-  }
-  if (message.action === "pushData") {
-    if (message.data.includes("登录查看")) {
-      setLocalStorage({ taskStatus: 0 });
-      updateDom();
-      return;
-    }
-    if (!message.data.includes("调用成功")) {
-      // 是否是验证页面
-      console.log("判断是否是验证页面");
-      if (isVerifyPage()) {
-        clearTimeout(timer);
-        setLocalStorage({
-          taskStatus: 0,
-        });
-        updateDom();
-      }
-      return;
-    }
-    if (await checkCanPush(JSON.parse(message.data))) {
-      goodsData = JSON.parse(message.data);
-    }
-    // let urlList =
-    // sendResponse({ pageTitle: document.title });
-  }
+﻿// 全局状态变量
+const state = {
+  timer: null, // 定时器引用
+  isUpload: false, // 上传状态标志
+  descData: null, // 描述数据
+  goodsData: null, // 商品数据
+  pushDataTimerId: null, // 数据推送定时器ID
+};
 
-  if (goodsData && descData && !isUpload) {
-    clearTimeout(pushDataTimerId);
-    pushDataTimerId = null;
-    isUpload = true;
-    const postData = {
-      ...goodsData.data,
-      desc: descData,
-    };
-    console.log(postData);
-    pushTaskResult(postData);
-  }
-});
-$(document).ready(async function () {
-  var panel = new Panel();
-  panel.init();
-  //点击开始
-  $(`#${DOM_IDS.task_start}`).on("click", () => {
-    setLocalStorage({ userId: $(`#${DOM_IDS.userId}`).val() });
-    if ($(`#${DOM_IDS.task_start}`).text() == "启") {
-      if (!checkUserIdLegal()) {
-        alert("请填写正确的手机号");
-        return;
-      }
-      setLocalStorage({ taskStatus: 1 });
-      $(`#${DOM_IDS.task_start}`).text("停").css({
-        background: "#000",
-        color: "#fff",
-      });
-      startGetTask();
-    } else {
-      $(`#${DOM_IDS.task_start}`).text("启").css({
-        background: "#7280f7",
-        color: "#fff",
-      });
-      setLocalStorage({ taskStatus: 0 });
+/**
+ * 初始化消息监听器
+ */
+function initMessageListener() {
+  chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
+    console.log('收到消息:', message);
+    
+    // 处理描述数据
+    if (message.action === "descData") {
+      state.descData = message.data;
+    }
+    
+    // 处理推送数据
+    if (message.action === "pushData") {
+      await handlePushData(message);
+    }
+
+    // 当有商品数据和描述数据且未上传时，执行上传
+    if (state.goodsData && state.descData && !state.isUpload) {
+      await handleDataUpload();
     }
   });
+}
+
+/**
+ * 处理推送数据
+ * @param {Object} message - 消息对象
+ */
+async function handlePushData(message) {
+  // 检查是否需要登录
+  if (message.data.includes("登录查看")) {
+    await updateTaskStatus(0);
+    return;
+  }
+
+  // 检查API调用是否成功
+  if (!message.data.includes("调用成功")) {
+    console.log("判断是否是验证页面");
+    if (isVerifyPage()) {
+      clearTimeout(state.timer);
+      await updateTaskStatus(0);
+    }
+    return;
+  }
+
+  // 检查是否可以推送数据
+  if (await checkCanPush(JSON.parse(message.data))) {
+    state.goodsData = JSON.parse(message.data);
+  }
+}
+
+/**
+ * 处理数据上传
+ */
+async function handleDataUpload() {
+  clearTimeout(state.pushDataTimerId);
+  state.pushDataTimerId = null;
+  state.isUpload = true;
+  
+  const postData = {
+    ...state.goodsData.data,
+    desc: state.descData,
+  };
+  
+  console.log('准备上传的数据:', postData);
+  await pushTaskResult(postData);
+}
+
+initMessageListener();
+
+/**
+ * 更新任务状态
+ * @param {number} status - 任务状态 (0: 停止, 1: 运行)
+ */
+async function updateTaskStatus(status) {
+  await setLocalStorage({ taskStatus: status });
+  await updateDom();
+}
+
+
+/**
+ * 初始化页面
+ */
+$(document).ready(async function () {
+  const panel = new Panel();
+  panel.init();
+  
+  // 绑定开始/停止按钮点击事件
+  $(`#${DOM_IDS.task_start}`).on("click", handleStartButtonClick);
 });
 
+/**
+ * 处理开始按钮点击事件
+ */
+async function handleStartButtonClick() {
+  const userId = $(`#${DOM_IDS.userId}`).val();
+  await setLocalStorage({ userId });
+  
+  const buttonText = $(`#${DOM_IDS.task_start}`).text();
+  
+  if (buttonText === "启") {
+    if (!await validateUserId()) return;
+    
+    await updateTaskStatus(1);
+    updateButtonUI("停", "#000", "#fff");
+    await startGetTask();
+  } else {
+    await updateTaskStatus(0);
+    updateButtonUI("启", "#7280f7", "#fff");
+  }
+}
+
+/**
+ * 验证用户ID
+ * @returns {Promise<boolean>} 是否验证通过
+ */
+async function validateUserId() {
+  if (!checkUserIdLegal()) {
+    alert("请填写正确的手机号");
+    return false;
+  }
+  return true;
+}
+
+/**
+ * 更新按钮UI
+ * @param {string} text - 按钮文本
+ * @param {string} bgColor - 背景颜色
+ * @param {string} textColor - 文字颜色
+ */
+function updateButtonUI(text, bgColor, textColor) {
+  $(`#${DOM_IDS.task_start}`)
+    .text(text)
+    .css({
+      background: bgColor,
+      color: textColor
+    });
+}
+
+/**
+ * 更新DOM元素
+ */
 const updateDom = async () => {
-  //获取基本信息
-  let baseInfo = await getLocalStorage({
+  const baseInfo = await getLocalStorage({
     task: {},
     task_get: 0,
     task_success: 0,
@@ -82,229 +158,239 @@ const updateDom = async () => {
     userId: "",
     interval: 10,
   });
+  
+  // 更新表单元素
   $(`#${DOM_IDS.interval}`).val(baseInfo.interval);
   $(`#${DOM_IDS.task_get}`).text(`${baseInfo.task_get}`);
   $(`#${DOM_IDS.task_success}`).text(`${baseInfo.task_success}`);
   $(`#${DOM_IDS.userId}`).val(baseInfo.userId);
 
-  if (baseInfo.taskStatus == 0) {
-    $(`#${DOM_IDS.task_start}`).text("启").css({
-      background: "#7280f7",
-      color: "#fff",
-    });
-  } else {
-    $(`#${DOM_IDS.task_start}`).text("停").css({
-      background: "#000",
-      color: "#fff",
-    });
-  }
+  // 更新按钮状态
+  updateButtonUI(
+    baseInfo.taskStatus === 0 ? "启" : "停",
+    baseInfo.taskStatus === 0 ? "#7280f7" : "#000",
+    "#fff"
+  );
 };
 
 /**
- * 获取任务
+ * 开始获取任务
  */
 const startGetTask = async () => {
-  let code = dayjs().format("mmssSSS");
+  const code = dayjs().format("mmssSSS");
   console.log("开始获取任务", code);
+  
   const chromeLocalStorage = await getLocalStorage({
     task_get: 0,
     taskStatus: 0,
     userId: "",
   });
-  // 获取商品ID前的判断(不用可以删除)
-  const reg = /^[1][3,4,5,6,7,8,9][0-9]{9}$/;
-  if (chromeLocalStorage.userId == "") {
-    setLocalStorage({ taskStatus: 0 });
-    updateDom();
-    return;
-  }
-  if (!reg.test(chromeLocalStorage.userId)) {
-    setLocalStorage({ taskStatus: 0 });
-    updateDom();
-    return;
-  }
-  if (!checkIsLogin()) {
-    setLocalStorage({ taskStatus: 0 });
-    updateDom();
-    return;
-  }
-  if (chromeLocalStorage.taskStatus == 0) {
-    setLocalStorage({ taskStatus: 0 });
-    updateDom();
-    return;
-  }
+  
+  // 验证前置条件
+  if (!await validateTaskPreconditions(chromeLocalStorage)) return;
+  
   const uuid = getUuid();
   const data = {
     uuid,
     userId: chromeLocalStorage.userId,
     code,
   };
-  // const task = await getTask(data);
+  
+  // 发送获取任务请求
   chrome.runtime.sendMessage(
     {
       type: "getTask",
       data: data,
-      reqHeaders: {
-        authorization: config.KEY,
-        version: config.API_VERSION,
-        version_cus: config.API_VERSION,
-        device: "web_extensions",
-        account_id: md5(getAccountId()),
-        session_id: md5(getSessionId()),
-        user_id: chromeLocalStorage.userId,
-      },
+      reqHeaders: getRequestHeaders(chromeLocalStorage.userId),
     },
-    (response) => {
-      console.log("获取任务结果", response);
-      if (response) {
-        console.log("请求成功，数据是：", response);
-        // 👉 在这里使用返回的数据，比如更新 UI 跳转
-        const task = response;
-        task.code = code;
-        // // 根据返回的内容执行操作
-        switch (task.status) {
-          case 200:
-            setLocalStorage({
-              task: task,
-              task_get: chromeLocalStorage.task_get + 1,
-            });
-            window.location.href = task.data.url;
-            break;
-          case 204:
-            setTimeout(function () {
-              startGetTask();
-            }, (task.sleep_time || 20) * 1000);
-            break;
-          case 500:
-            setTimeout(function () {
-              startGetTask();
-            }, (task.sleep_time || 50) * 1000);
-            break;
-          default:
-            setTimeout(function () {
-              startGetTask();
-            }, (task.sleep_time || 50) * 1000);
-            break;
-        }
-      } else {
-        console.error("请求失败：", response);
-      }
-    }
+    handleGetTaskResponse(code, chromeLocalStorage)
   );
 };
 
 /**
- * 提交任务
+ * 验证任务前置条件
+ * @param {Object} storage - 本地存储数据
+ * @returns {Promise<boolean>} 是否验证通过
+ */
+async function validateTaskPreconditions(storage) {
+  const reg = /^[1][3,4,5,6,7,8,9][0-9]{9}$/;
+  
+  if (!storage.userId || !reg.test(storage.userId) || 
+      !checkIsLogin() || storage.taskStatus === 0) {
+    await updateTaskStatus(0);
+    return false;
+  }
+  
+  return true;
+}
+
+/**
+ * 获取请求头
+ * @param {string} userId - 用户ID
+ * @returns {Object} 请求头对象
+ */
+function getRequestHeaders(userId) {
+  return {
+    authorization: config.KEY,
+    version: config.API_VERSION,
+    version_cus: config.API_VERSION,
+    device: "web_extensions",
+    account_id: md5(getAccountId()),
+    session_id: md5(getSessionId()),
+    user_id: userId,
+  };
+}
+
+/**
+ * 处理获取任务响应
+ * @param {string} code - 任务代码
+ * @param {Object} storage - 本地存储数据
+ * @returns {Function} 回调函数
+ */
+function handleGetTaskResponse(code, storage) {
+  return (response) => {
+    if (!response) {
+      console.error("请求失败：", response);
+      return;
+    }
+    
+    console.log("请求成功，数据是：", response);
+    const task = response;
+    task.code = code;
+    
+    // 根据状态码处理响应
+    switch (task.status) {
+      case 200:
+        handleSuccessfulTaskResponse(task, storage);
+        break;
+      case 204:
+      case 500:
+      default:
+        handleRetryTaskResponse(task);
+        break;
+    }
+  };
+}
+
+/**
+ * 处理成功的任务响应
+ * @param {Object} task - 任务对象
+ * @param {Object} storage - 本地存储数据
+ */
+async function handleSuccessfulTaskResponse(task, storage) {
+  await setLocalStorage({
+    task: task,
+    task_get: storage.task_get + 1,
+  });
+  window.location.href = task.data.url;
+}
+
+/**
+ * 处理需要重试的任务响应
+ * @param {Object} task - 任务对象
+ */
+function handleRetryTaskResponse(task) {
+  const delay = (task.sleep_time || (task.status === 204 ? 20 : 50)) * 1000;
+  setTimeout(startGetTask, delay);
+}
+
+/**
+ * 提交任务结果
+ * @param {Object} data - 要提交的数据
  */
 const pushTaskResult = async (data) => {
-  const { task, taskStatus, userId, interval } = await getLocalStorage({
+  const { task, userId, interval } = await getLocalStorage({
     task: {},
-    taskStatus: 0,
     userId: "",
     interval: 10,
   });
-  let code = dayjs().format("mmssSSS");
+  
+  const code = dayjs().format("mmssSSS");
   const uuid = getUuid();
-  let lastData = data;
+  
   const postObj = {
     getDto: task.data,
-    data: lastData,
+    data: data,
     url: window.location.href,
   };
+  
   localStorage.removeItem("goodsData");
-  //提交数据
+  
+  // 提交数据
   chrome.runtime.sendMessage(
     {
       type: "pushTask",
       data: postObj,
       code: "code",
-      reqHeaders: {
-        authorization: config.KEY,
-        version: config.API_VERSION,
-        version_cus: config.API_VERSION,
-        device: "web_extensions",
-        account_id: md5(getAccountId()),
-        session_id: md5(getSessionId()),
-        user_id: userId,
-      },
+      reqHeaders: getRequestHeaders(userId),
     },
-    async (res) => {
-      console.log("获取任务结果", res);
-      if (res) {
-        console.log("请求成功，数据是：", res);
-        //清空数据
-        setLocalStorage({
-          task: {},
-        });
-        res.code = code;
-        //间隔时间
-        let randomSleepTime = interval ?? 10;
-        res.sleep_time = randomSleepTime;
-        //根据请求返回内容执行操作
-        switch (res.status) {
-          case 200:
-            const { task_success } = await getLocalStorage({ task_success: 0 });
-            setLocalStorage({
-              task_success: task_success + 1,
-            });
-            setTimeout(function () {
-              startGetTask();
-            }, (res.sleep_time || 10) * 1000);
-            break;
-          case 500:
-            setTimeout(function () {
-              startGetTask();
-            }, (res.sleep_time || 120) * 1000);
-            break;
-          default:
-            setTimeout(() => {
-              startGetTask();
-            }, (res.sleep_time || 120) * 1000);
-            break;
-        }
-        //   流程结束更新页面数据
-        updateDom();
-        // 👉 在这里使用返回的数据，比如更新 UI
-      } else {
-        console.error("请求失败：", response);
-      }
-    }
+    handlePushTaskResponse(code, interval)
   );
 };
 
 /**
- * @description 验证是否填写手机号
- * @return Boolean
+ * 处理推送任务响应
+ * @param {string} code - 任务代码
+ * @param {number} interval - 间隔时间
+ * @returns {Function} 回调函数
+ */
+function handlePushTaskResponse(code, interval) {
+  return async (res) => {
+    if (!res) {
+      console.error("请求失败：", res);
+      return;
+    }
+    
+    console.log("请求成功，数据是：", res);
+    await setLocalStorage({ task: {} });
+    
+    res.code = code;
+    const sleepTime = res.sleep_time || (res.status === 200 ? interval : 120);
+    
+    // 根据状态码处理响应
+    switch (res.status) {
+      case 200:
+        await handleSuccessfulPushResponse();
+        break;
+    }
+    
+    // 设置重试
+    setTimeout(startGetTask, sleepTime * 1000);
+    await updateDom();
+  };
+}
+
+/**
+ * 处理成功的推送响应
+ */
+async function handleSuccessfulPushResponse() {
+  const { task_success } = await getLocalStorage({ task_success: 0 });
+  await setLocalStorage({ task_success: task_success + 1 });
+}
+
+/**
+ * 验证用户ID是否合法
+ * @returns {boolean} 是否合法
  */
 const checkUserIdLegal = () => {
   const userId = $(`#${DOM_IDS.userId}`).val();
-  if (userId == "") {
-    return false;
-  }
   const reg = /^[1][3,4,5,6,7,8,9][0-9]{9}$/;
-  if (!reg.test(userId)) {
-    return false;
-  }
-  return true;
+  return !!userId && reg.test(userId);
 };
 
 /**
- * @description 验证是否已登陆
- * @return Boolean
+ * 验证是否已登录
+ * @returns {boolean} 是否已登录
  */
 const checkIsLogin = () => {
-  const accountId = getAccountId();
-  if (accountId) {
-    return true;
-  } else {
-    return false;
-  }
+  return !!getAccountId();
 };
+
 /**
- * @description 验证是否满足上传数据条件
- * @return Boolean
+ * 验证是否可以推送数据
+ * @returns {Promise<boolean>} 是否可以推送
  */
 const checkCanPush = async () => {
-  // 在这检查是否满足上传数据的条件（不满足则返回fasle）
+  // 在这里添加验证逻辑
   return true;
 };

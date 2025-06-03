@@ -1,3 +1,4 @@
+// DOMID
 const DOM_IDS = {
   task_start: generateRandomString(8),
   task_get: generateRandomString(8),
@@ -6,6 +7,7 @@ const DOM_IDS = {
   interval: generateRandomString(8),
   clearData: generateRandomString(8),
 };
+
 const config = {
   KEY: "20a92caa3d1b3ed7c86aaace9b84604e",
   /**

@@ -28,15 +28,11 @@ const storage = {
   },
 };
 
-const isAppGoods = () => {
-  let sign = false;
-  if (window.document.body.innerHTML.includes("商品仅支持在客户端购买")) {
-    sign = true;
-    return sign;
-  }
-  return sign;
-};
 
+/**
+ * 商品不存在页面
+ * @returns 
+ */
 const isGoodsNotFount = () => {
   let sign = false;
   if (window.document.body.innerHTML.includes("宝贝不在了")) {
@@ -60,6 +56,11 @@ const isGoodsNotFount = () => {
   return sign;
 };
 
+/**
+ * 获取Url的参数
+ * @param {string} url 
+ * @returns 
+ */
 function getUrlParams(url) {
   const params = {};
   const regex = /[?&]([^=#]+)=([^&#]*)/g;
@@ -70,6 +71,10 @@ function getUrlParams(url) {
   return params;
 }
 
+/**
+ * 是否是登录页面
+ * @returns 
+ */
 const isLoginPage = () => {
   let sign = false;
   // 淘宝的登录页面
@@ -83,6 +88,10 @@ const isLoginPage = () => {
   }
 };
 
+/**
+ * 是否是验证弹窗
+ * @returns 
+ */
 const isVerifyPage = () => {
   let sign = false;
   // 淘宝的验证1
@@ -106,6 +115,7 @@ const isVerifyPage = () => {
   }
   return sign;
 };
+
 /**
  * 获取用户id
  */
@@ -141,6 +151,7 @@ const getSessionId = () => {
   }
   return sessionId;
 };
+
 /**
  * 获取chrome本地存储
  * @param {*} options
@@ -170,6 +181,7 @@ const getLocalStorage = (options) => {
 const setLocalStorage = (options) => {
   chrome.storage.local.set(options);
 };
+
 
 /**
  * 获取uuid

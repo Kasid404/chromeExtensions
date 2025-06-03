@@ -19,7 +19,6 @@
         "*://*.goofish.com/*"
       ],
       "js": [
-        "js/lib/crypto-js.min.js",
         "js/lib/jquery-1.8.3.js",
         "js/lib/axios.js",
         "js/lib/day.min.js",
