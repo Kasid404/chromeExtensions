@@ -1,0 +1,54 @@
+{
+  "manifest_version": 3,
+  "name": "Spider",
+  "version": "1.0.0",
+  "description": "AHhhhhh",
+  "icons": {
+    "16": "img/icon.png",
+    "48": "img/icon.png",
+    "128": "img/icon.png"
+  },
+  "content_scripts": [
+    {
+      "type": "module",
+      "matches": [
+        "*://*.taobao.com/*",
+        "*://*.alicdn.com/*",
+        "*://*.tmall.com/*",
+        "*://*.tmall.hk/*",
+        "*://*.goofish.com/*"
+      ],
+      "js": [
+        "js/lib/crypto-js.min.js",
+        "js/lib/jquery-1.8.3.js",
+        "js/lib/axios.js",
+        "js/lib/day.min.js",
+        "js/lib/md5.min.js",
+        "js/utils.js",
+        "js/config.js",
+        "js/panel.js",
+        "js/content.js"
+      ],
+      "css": [],
+      "run_at": "document_start"
+    }
+  ],
+  "permissions": [
+    "contextMenus",
+    "activeTab",
+    "tabs",
+    "notifications",
+    "webRequest",
+    "storage",
+    "debugger"
+  ],
+  "host_permissions": [],
+  "omnibox": {
+    "keyword": "go"
+  },
+  "background": {
+    "service_worker": "js/background.js",
+    "type": "module"
+  },
+  "devtools_page": "devtools.html"
+}
