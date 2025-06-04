@@ -37,7 +37,7 @@ const getTask = async (data, headersData = {}) => {
       ct: Math.floor(Date.now() / 1000),
     };
     const response = await fetch(
-      `${TASK_API_URL}?code=${data.code}&debug=true`,
+      `${TASK_API_URL}?code=${data.code}`,
       {
         method: "GET",
         headers: headers,
@@ -77,7 +77,7 @@ const pushTask = async (data, code, headersData = {}) => {
       "Content-Type": "application/json",
     };
 
-    const response = await fetch(`${TASK_API_URL}?code=${code}&debug=true`, {
+    const response = await fetch(`${TASK_API_URL}?code=${code}`, {
       method: "POST",
       headers: headers,
       body: JSON.stringify(data),
