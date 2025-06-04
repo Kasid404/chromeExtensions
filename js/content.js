@@ -233,7 +233,6 @@ function getRequestHeaders(userId) {
   return {
     authorization: config.KEY,
     version: config.API_VERSION,
-    version_cus: config.API_VERSION,
     device: "web_extensions",
     account_id: md5(getAccountId()),
     session_id: md5(getSessionId()),
